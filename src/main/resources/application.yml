@@ -1,0 +1,27 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: ms-pedidos360-bff
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:https://login.microsoftonline.com/<TENANT_ID>/v2.0}
+          audiences: ${JWT_AUDIENCE:api://<API_CLIENT_ID>}
+          jwk-set-uri: ${JWT_JWK_SET_URI:}
+
+orders:
+  service:
+    url: ${ORDERS_SERVICE_URL:http://localhost:8082}
+
+catalog:
+  service:
+    url: ${CATALOG_SERVICE_URL:http://localhost:8081}
+
+logging:
+  level:
+    root: INFO
+    com.pedidos360.bff: DEBUG
+    org.springframework.security: DEBUG
