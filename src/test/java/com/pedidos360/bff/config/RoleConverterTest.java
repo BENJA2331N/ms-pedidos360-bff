@@ -59,6 +59,22 @@ class RoleConverterTest {
     }
 
     @Test
+    @DisplayName("Debe mapear el claim scp (string separado por espacios) a autoridades SCOPE_ junto a los roles")
+    void shouldMapScpToScopeAuthorities() {
+        Jwt jwt = createJwtWithClaims(Map.of(
+                "roles", List.of("ADMIN"),
+                "scp", "access_as_user user.read"));
+
+        List<String> names = roleConverter.extractAuthorities(jwt).stream()
+                .map(GrantedAuthority::getAuthority).toList();
+
+        assertEquals(3, names.size());
+        assertTrue(names.contains("ROLE_ADMIN"));
+        assertTrue(names.contains("SCOPE_access_as_user"));
+        assertTrue(names.contains("SCOPE_user.read"));
+    }
+
+    @Test
     @DisplayName("Debe retornar lista vacía si jwt es nulo")
     void shouldReturnEmptyListWhenJwtIsNull() {
         Collection<GrantedAuthority> authorities = roleConverter.extractAuthorities(null);

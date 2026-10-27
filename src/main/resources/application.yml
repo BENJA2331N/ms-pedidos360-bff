@@ -6,6 +6,10 @@ server:
 clients:
   rabbit-admin-url: ${RABBIT_ADMIN_URL:http://localhost:8083}
 
+# Orígenes permitidos por CORS (separados por coma). En producción: dominio del front desplegado.
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4200}
+
 spring:
   application:
     name: ms-pedidos360-bff

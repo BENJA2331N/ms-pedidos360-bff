@@ -7,10 +7,16 @@ import com.pedidos360.bff.dto.QueueAdminRequestDTO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Proxy del BFF hacia ms-pedidos360-rabbit-admin. Valida la entrada y delega en {@link RabbitAdminClient}.
+ * Acceso restringido al rol ADMIN (ver SecurityConfig).
+ */
+@Validated
 @RestController
 @RequestMapping("/api/rabbit-admin")
 public class RabbitAdminProxyController {
@@ -44,5 +50,13 @@ public class RabbitAdminProxyController {
     @PostMapping("/bindings")
     public ResponseEntity<Map<String, String>> createBinding(@Valid @RequestBody BindingAdminRequestDTO request) {
         return rabbitAdminClient.createBinding(request);
+    }
+
+    @DeleteMapping("/bindings")
+    public ResponseEntity<Map<String, String>> deleteBinding(
+            @RequestParam("queueName") @NotBlank(message = "El nombre de la cola no puede estar vacío") String queueName,
+            @RequestParam("exchangeName") @NotBlank(message = "El nombre del exchange no puede estar vacío") String exchangeName,
+            @RequestParam("routingKey") @NotBlank(message = "El routingKey no puede estar vacío") String routingKey) {
+        return rabbitAdminClient.deleteBinding(queueName, exchangeName, routingKey);
     }
 }

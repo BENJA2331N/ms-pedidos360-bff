@@ -47,6 +47,10 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    // Orígenes permitidos para CORS (sin comodines). En AWS/Azure agregar el dominio del front desplegado.
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:4200}")
+    private List<String> allowedOrigins;
+
     public SecurityConfig(RoleConverter roleConverter) {
         this.roleConverter = roleConverter;
     }
@@ -112,9 +116,7 @@ public class SecurityConfig {
     public JwtDecoder jwtDecoder() {
         if (jwkSetUri != null && !jwkSetUri.isBlank()) {
             NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            OAuth2TokenValidator<Jwt> audienceValidator = new AudienceValidator(audience);
-            OAuth2TokenValidator<Jwt> defaultValidators = JwtValidators.createDefault();
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultValidators, audienceValidator));
+            decoder.setJwtValidator(tokenValidator());
             return decoder;
         }
 
@@ -126,18 +128,25 @@ public class SecurityConfig {
             };
         }
 
+        // La firma se verifica con las claves públicas (JWKS) descubiertas desde el issuer-uri
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
-        OAuth2TokenValidator<Jwt> audienceValidator = new AudienceValidator(audience);
-        OAuth2TokenValidator<Jwt> defaultValidators = JwtValidators.createDefault();
-        OAuth2TokenValidator<Jwt> tenantValidator = token -> {
-            String iss = token.getIssuer() != null ? token.getIssuer().toString() : "";
-            if (iss.contains("c8d0fa9a-8d78-47b0-b443-f5419b74a5a8") || iss.contains("login.microsoftonline.com") || iss.contains("sts.windows.net")) {
-                return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success();
-            }
-            return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(new org.springframework.security.oauth2.core.OAuth2Error("invalid_token", "Issuer invalido: " + iss, null));
-        };
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultValidators, audienceValidator, tenantValidator));
+        decoder.setJwtValidator(tokenValidator());
         return decoder;
+    }
+
+    /**
+     * Validadores aplicados a todo JWT: vigencia (exp/nbf), issuer exacto del tenant (v1 o v2) y audience.
+     * Si el issuer-uri no está configurado se omite solo la validación de issuer.
+     */
+    private OAuth2TokenValidator<Jwt> tokenValidator() {
+        OAuth2TokenValidator<Jwt> timestampValidators = JwtValidators.createDefault();
+        OAuth2TokenValidator<Jwt> audienceValidator = new AudienceValidator(audience);
+        java.util.Set<String> allowedIssuers = AllowedIssuersValidator.allowedFor(issuerUri);
+        if (allowedIssuers.isEmpty()) {
+            return new DelegatingOAuth2TokenValidator<>(timestampValidators, audienceValidator);
+        }
+        return new DelegatingOAuth2TokenValidator<>(
+                timestampValidators, new AllowedIssuersValidator(allowedIssuers), audienceValidator);
     }
 
     @Bean
@@ -182,10 +191,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // Orígenes específicos sin comodines para cumplir 100% con la rúbrica de seguridad
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:4200"
-        ));
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",

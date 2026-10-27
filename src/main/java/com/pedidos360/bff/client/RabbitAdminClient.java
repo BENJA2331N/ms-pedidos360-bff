@@ -32,11 +32,13 @@ public class RabbitAdminClient {
     }
 
     public ResponseEntity<Map<String, String>> deleteQueue(String name) {
+        // {name} se expande como variable de URI para codificar correctamente caracteres especiales
         return restTemplate.exchange(
-                rabbitAdminUrl + "/api/rabbit-admin/queues/" + name,
+                rabbitAdminUrl + "/api/rabbit-admin/queues/{name}",
                 HttpMethod.DELETE,
                 null,
-                new ParameterizedTypeReference<Map<String, String>>() {}
+                new ParameterizedTypeReference<Map<String, String>>() {},
+                name
         );
     }
 
@@ -50,10 +52,11 @@ public class RabbitAdminClient {
 
     public ResponseEntity<Map<String, String>> deleteExchange(String name) {
         return restTemplate.exchange(
-                rabbitAdminUrl + "/api/rabbit-admin/exchanges/" + name,
+                rabbitAdminUrl + "/api/rabbit-admin/exchanges/{name}",
                 HttpMethod.DELETE,
                 null,
-                new ParameterizedTypeReference<Map<String, String>>() {}
+                new ParameterizedTypeReference<Map<String, String>>() {},
+                name
         );
     }
 
@@ -62,6 +65,16 @@ public class RabbitAdminClient {
                 rabbitAdminUrl + "/api/rabbit-admin/bindings",
                 dto,
                 (Class<Map<String, String>>) (Class<?>) Map.class
+        );
+    }
+
+    public ResponseEntity<Map<String, String>> deleteBinding(String queueName, String exchangeName, String routingKey) {
+        return restTemplate.exchange(
+                rabbitAdminUrl + "/api/rabbit-admin/bindings?queueName={q}&exchangeName={e}&routingKey={r}",
+                HttpMethod.DELETE,
+                null,
+                new ParameterizedTypeReference<Map<String, String>>() {},
+                queueName, exchangeName, routingKey
         );
     }
 }
