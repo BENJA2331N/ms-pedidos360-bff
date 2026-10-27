@@ -1,5 +1,10 @@
 server:
   port: ${SERVER_PORT:8080}
+  address: 0.0.0.0
+  forward-headers-strategy: framework
+
+clients:
+  rabbit-admin-url: ${RABBIT_ADMIN_URL:http://localhost:8083}
 
 spring:
   application:
@@ -8,8 +13,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${JWT_ISSUER_URI:https://login.microsoftonline.com/<TENANT_ID>/v2.0}
-          audiences: ${JWT_AUDIENCE:api://<API_CLIENT_ID>}
+          issuer-uri: ${JWT_ISSUER_URI:https://login.microsoftonline.com/c8d0fa9a-8d78-47b0-b443-f5419b74a5a8/v2.0}
+          audiences: ${JWT_AUDIENCE:api://5805f927-e607-48f6-bcdb-c97e93a8f6dd}
           jwk-set-uri: ${JWT_JWK_SET_URI:}
 
 orders:

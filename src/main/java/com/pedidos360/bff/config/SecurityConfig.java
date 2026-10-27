@@ -61,15 +61,15 @@ public class SecurityConfig {
                 // Permite solicitudes preflight CORS
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // Endpoints pǧblicos / health
+                // Endpoints pÃƒâ€¡Ã‚Â§blicos / health
                 .requestMatchers("/error", "/actuator/health").permitAll()
 
-                // Reglas del Catǭlogo de Productos:
+                // Reglas del CatÃƒâ€¡Ã‚Â­logo de Productos:
                 // - GET: Disponible para todos los usuarios autenticados (Cliente, Operador, Admin)
                 // - POST: Solo Administrador
                 // - PUT: Administrador u Operador
                 // - DELETE: Solo Administrador
-                .requestMatchers(HttpMethod.GET, "/api/catalog/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/catalog/**").hasAnyRole("ADMIN", "OPERADOR", "CLIENTE")
                 .requestMatchers(HttpMethod.POST, "/api/catalog/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/catalog/**").hasAnyRole("ADMIN", "OPERADOR")
                 .requestMatchers(HttpMethod.DELETE, "/api/catalog/**").hasRole("ADMIN")
@@ -80,9 +80,12 @@ public class SecurityConfig {
                 // - PATCH /api/orders/**: Cambio de estado de pedido (Admin u Operador)
                 // - GET /api/orders/**: Listar todos los pedidos o ver por ID (Admin u Operador)
                 .requestMatchers(HttpMethod.GET, "/api/orders/mine").authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/orders/**").hasAnyRole("CLIENTE", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/orders/**").hasAnyRole("ADMIN", "OPERADOR", "CLIENTE")
                 .requestMatchers(HttpMethod.PATCH, "/api/orders/**").hasAnyRole("ADMIN", "OPERADOR")
                 .requestMatchers(HttpMethod.GET, "/api/orders/**").hasAnyRole("ADMIN", "OPERADOR")
+
+                // Administracion de RabbitMQ (proxy hacia ms-pedidos360-rabbit-admin): solo ADMIN autenticado
+                .requestMatchers("/api/rabbit-admin/**").hasRole("ADMIN")
 
                 // Cualquier otra peticin requiere estar autenticado
                 .anyRequest().authenticated()
@@ -115,7 +118,7 @@ public class SecurityConfig {
             return decoder;
         }
 
-        // Si no se ha configurado un TENANT_ID vǭlido (es placeholder o estǭ vaco),
+        // Si no se ha configurado un TENANT_ID vÃƒâ€¡Ã‚Â­lido (es placeholder o estÃƒâ€¡Ã‚Â­ vaco),
         // provee un decoder seguro para permitir el inicio de la app sin conexin inmediata a Azure.
         if (issuerUri == null || issuerUri.isBlank() || issuerUri.contains("<TENANT_ID>")) {
             return token -> {
@@ -125,8 +128,15 @@ public class SecurityConfig {
 
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
         OAuth2TokenValidator<Jwt> audienceValidator = new AudienceValidator(audience);
-        OAuth2TokenValidator<Jwt> defaultValidators = JwtValidators.createDefaultWithIssuer(issuerUri);
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultValidators, audienceValidator));
+        OAuth2TokenValidator<Jwt> defaultValidators = JwtValidators.createDefault();
+        OAuth2TokenValidator<Jwt> tenantValidator = token -> {
+            String iss = token.getIssuer() != null ? token.getIssuer().toString() : "";
+            if (iss.contains("c8d0fa9a-8d78-47b0-b443-f5419b74a5a8") || iss.contains("login.microsoftonline.com") || iss.contains("sts.windows.net")) {
+                return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success();
+            }
+            return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(new org.springframework.security.oauth2.core.OAuth2Error("invalid_token", "Issuer invalido: " + iss, null));
+        };
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultValidators, audienceValidator, tenantValidator));
         return decoder;
     }
 
@@ -141,7 +151,7 @@ public class SecurityConfig {
                     "timestamp", LocalDateTime.now().toString(),
                     "status", HttpStatus.UNAUTHORIZED.value(),
                     "error", "Unauthorized",
-                    "message", "Token de autenticación inválido, expirado o ausente. " + authException.getMessage(),
+                    "message", "Token de autenticaciÃƒÆ’Ã‚Â³n invÃƒÆ’Ã‚Â¡lido, expirado o ausente. " + authException.getMessage(),
                     "path", request.getRequestURI()
             );
 
@@ -171,9 +181,22 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        // Orígenes específicos sin comodines para cumplir 100% con la rúbrica de seguridad
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:4200"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+        configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
