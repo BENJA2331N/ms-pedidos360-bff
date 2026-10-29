@@ -3,6 +3,7 @@ package com.pedidos360.bff.client;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -13,7 +14,7 @@ public class OrdersClient {
 
     public OrdersClient(@Value("${orders.service.url:http://localhost:8082}") String ordersUrl,
                         RestClient.Builder builder) {
-        this.restClient = builder.baseUrl(ordersUrl).build();
+        this.restClient = builder.baseUrl(ordersUrl).requestFactory(new JdkClientHttpRequestFactory()).build();
     }
 
     /**
