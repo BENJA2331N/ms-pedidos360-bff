@@ -3,6 +3,7 @@ package com.pedidos360.bff.controller;
 import com.pedidos360.bff.client.RabbitAdminClient;
 import com.pedidos360.bff.config.RoleConverter;
 import com.pedidos360.bff.config.SecurityConfig;
+import com.pedidos360.bff.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = RabbitAdminProxyController.class)
-@Import({SecurityConfig.class, RoleConverter.class})
+@Import({SecurityConfig.class, RoleConverter.class, GlobalExceptionHandler.class})
 class RabbitAdminProxyControllerTest {
 
     private static final String QUEUE_JSON = "{\"name\":\"cola.test\",\"durable\":true}";
@@ -92,5 +93,20 @@ class RabbitAdminProxyControllerTest {
                         .param("queueName", "q").param("exchangeName", "e").param("routingKey", "rk"))
                 .andExpect(status().isOk());
         verify(rabbitAdminClient).deleteBinding("q", "e", "rk");
+    }
+
+    @Test
+    @DisplayName("ADMIN elimina binding sin query params o en blanco -> 400 Bad Request")
+    void adminDeleteBindingMissingOrBlankParamsReturns400() throws Exception {
+        mockMvc.perform(delete("/api/rabbit-admin/bindings")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(delete("/api/rabbit-admin/bindings")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .param("queueName", "  ").param("exchangeName", "e").param("routingKey", "rk"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(rabbitAdminClient);
     }
 }

@@ -1,14 +1,17 @@
 package com.pedidos360.bff.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -48,7 +51,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Propaga códigos de error (4xx y 5xx) recibidos desde los microservicios downstream (Orders o Catalog).
+     * Propaga códigos de error (4xx y 5xx) recibidos desde los microservicios downstream (Orders, Catalog o RabbitAdmin).
      */
     @ExceptionHandler(HttpStatusCodeException.class)
     public ResponseEntity<?> handleHttpStatusCodeException(HttpStatusCodeException ex) {
@@ -93,15 +96,39 @@ public class GlobalExceptionHandler {
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             errors.put(error.getField(), error.getDefaultMessage());
         }
+        return badRequest("Errores de validación en la solicitud enviada al BFF", errors);
+    }
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Bad Request");
-        body.put("message", "Errores de validación en la solicitud enviada al BFF");
-        body.put("fieldErrors", errors);
+    /**
+     * Captura validaciones de parámetros (@Validated / @NotBlank en path o query params) -> 400 Bad Request.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getConstraintViolations().forEach(v -> {
+            String path = v.getPropertyPath().toString();
+            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+            errors.put(field, v.getMessage());
+        });
+        return badRequest("Parámetros de solicitud inválidos", errors);
+    }
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    /**
+     * Captura parámetros obligatorios ausentes en query string -> 400 Bad Request.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParam(MissingServletRequestParameterException ex) {
+        return badRequest("Falta un parámetro obligatorio en la solicitud",
+                Map.of(ex.getParameterName(), "El parámetro es obligatorio"));
+    }
+
+    /**
+     * Captura JSON malformado o cuerpo ausente -> 400 Bad Request.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadable(HttpMessageNotReadableException ex) {
+        return badRequest("El cuerpo de la petición es obligatorio y debe ser un JSON válido",
+                Map.of("body", "JSON inválido o ausente"));
     }
 
     /**
@@ -115,5 +142,16 @@ public class GlobalExceptionHandler {
         body.put("error", "Internal Server Error");
         body.put("message", "Ocurrió un error inesperado en el BFF: " + ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    private ResponseEntity<Map<String, Object>> badRequest(String message, Map<String, String> fieldErrors) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Bad Request");
+        body.put("message", message);
+        body.put("fieldErrors", fieldErrors);
+        body.put("detalles", fieldErrors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 }

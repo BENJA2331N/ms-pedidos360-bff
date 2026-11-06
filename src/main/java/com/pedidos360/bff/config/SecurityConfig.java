@@ -198,6 +198,7 @@ public class SecurityConfig {
                 "Content-Type",
                 "Accept",
                 "X-Requested-With",
+                "X-User-Role",
                 "Origin",
                 "Access-Control-Request-Method",
                 "Access-Control-Request-Headers"

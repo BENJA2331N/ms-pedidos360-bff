@@ -4,9 +4,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.util.Map;
+
 /**
  * Datos para crear una cola. El nombre no puede estar vacío, superar 255 caracteres
- * ni usar el prefijo "amq." (reservado por RabbitMQ).
+ * ni usar el prefijo "amq." (reservado por RabbitMQ). Permite opcionalmente
+ * asociar un Dead Letter Exchange (DLX) y routing key.
  */
 public class QueueAdminRequestDTO {
 
@@ -17,10 +20,24 @@ public class QueueAdminRequestDTO {
 
     private boolean durable = true;
 
+    @Size(max = 255, message = "El nombre del deadLetterExchange no puede superar los 255 caracteres")
+    private String deadLetterExchange;
+
+    @Size(max = 255, message = "El deadLetterRoutingKey no puede superar los 255 caracteres")
+    private String deadLetterRoutingKey;
+
+    private Map<String, Object> arguments;
+
     public QueueAdminRequestDTO() {}
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public boolean isDurable() { return durable; }
     public void setDurable(boolean durable) { this.durable = durable; }
+    public String getDeadLetterExchange() { return deadLetterExchange; }
+    public void setDeadLetterExchange(String deadLetterExchange) { this.deadLetterExchange = deadLetterExchange; }
+    public String getDeadLetterRoutingKey() { return deadLetterRoutingKey; }
+    public void setDeadLetterRoutingKey(String deadLetterRoutingKey) { this.deadLetterRoutingKey = deadLetterRoutingKey; }
+    public Map<String, Object> getArguments() { return arguments; }
+    public void setArguments(Map<String, Object> arguments) { this.arguments = arguments; }
 }

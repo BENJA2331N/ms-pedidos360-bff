@@ -2,9 +2,17 @@ target/
 .idea/
 *.class
 .env
+.env.*
+!.env.example
 application-local.yml
 application-local.properties
+wallet/
+*.sso
+*.p12
+*.jks
 *.iml
 .vscode/
+.agents/
+*.code-workspace
 *.log
 .DS_Store

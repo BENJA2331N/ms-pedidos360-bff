@@ -53,16 +53,32 @@ class SecurityAndProxyControllerTest {
     private CatalogClient catalogClient;
 
     // =========================================================================
-    // 1. Pruebas de Autenticación General (401 Unauthorized)
+    // 1. Pruebas de Autenticación General (401 Unauthorized vs Catálogo Público)
     // =========================================================================
 
     @Test
-    @DisplayName("Petición sin token debe retornar 401 Unauthorized")
+    @DisplayName("Petición sin token a recursos protegidos debe retornar 401 Unauthorized")
     void shouldReturn401WhenUnauthenticated() throws Exception {
-        mockMvc.perform(get("/api/catalog/products"))
+        mockMvc.perform(get("/api/orders/mine"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.error").value("Unauthorized"));
+
+        ProductRequestDTO dto = new ProductRequestDTO("Teclado", "Mecánico", new BigDecimal("49.990"), 10);
+        mockMvc.perform(post("/api/catalog/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("Consulta pública del catálogo sin token GET /api/catalog/products -> 200 OK")
+    void publicCanReadCatalogWithoutToken() throws Exception {
+        when(catalogClient.getAllProducts()).thenReturn(ResponseEntity.ok(List.of()));
+
+        mockMvc.perform(get("/api/catalog/products"))
+                .andExpect(status().isOk());
     }
 
     // =========================================================================
