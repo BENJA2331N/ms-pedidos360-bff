@@ -65,22 +65,22 @@ public class SecurityConfig {
                 // Permite solicitudes preflight CORS
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // Endpoints pÃƒâ€¡Ã‚Â§blicos / health
+                // Endpoints públicos / health
                 .requestMatchers("/error", "/actuator/health").permitAll()
 
-                // Reglas del CatÃƒâ€¡Ã‚Â­logo de Productos:
-                // - GET: Disponible para todos los usuarios autenticados (Cliente, Operador, Admin)
+                // Reglas del Catálogo de Productos:
+                // - GET: Público para consultar el catálogo de productos sin o con sesión
                 // - POST: Solo Administrador
                 // - PUT: Administrador u Operador
                 // - DELETE: Solo Administrador
-                .requestMatchers(HttpMethod.GET, "/api/catalog/**").hasAnyRole("ADMIN", "OPERADOR", "CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/catalog/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/catalog/**").hasAnyRole("ADMIN", "OPERADOR")
                 .requestMatchers(HttpMethod.DELETE, "/api/catalog/**").hasRole("ADMIN")
 
                 // Reglas del Servicio de Pedidos:
                 // - GET /api/orders/mine: Pedidos propios del cliente autenticado
-                // - POST /api/orders: Creacin de pedido (Cliente o Admin)
+                // - POST /api/orders: Creación de pedido (Cliente, Operador o Admin)
                 // - PATCH /api/orders/**: Cambio de estado de pedido (Admin u Operador)
                 // - GET /api/orders/**: Listar todos los pedidos o ver por ID (Admin u Operador)
                 .requestMatchers(HttpMethod.GET, "/api/orders/mine").authenticated()
@@ -88,10 +88,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/orders/**").hasAnyRole("ADMIN", "OPERADOR")
                 .requestMatchers(HttpMethod.GET, "/api/orders/**").hasAnyRole("ADMIN", "OPERADOR")
 
-                // Administracion de RabbitMQ (proxy hacia ms-pedidos360-rabbit-admin): solo ADMIN autenticado
+                // Administración de RabbitMQ (proxy hacia ms-pedidos360-rabbit-admin): solo ADMIN autenticado
                 .requestMatchers("/api/rabbit-admin/**").hasRole("ADMIN")
 
-                // Cualquier otra peticin requiere estar autenticado
+                // Cualquier otra petición requiere estar autenticado
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
@@ -120,8 +120,8 @@ public class SecurityConfig {
             return decoder;
         }
 
-        // Si no se ha configurado un TENANT_ID vÃƒâ€¡Ã‚Â­lido (es placeholder o estÃƒâ€¡Ã‚Â­ vaco),
-        // provee un decoder seguro para permitir el inicio de la app sin conexin inmediata a Azure.
+        // Si no se ha configurado un TENANT_ID válido (es placeholder o está vacío),
+        // provee un decoder seguro para permitir el inicio de la app sin conexión inmediata a Azure.
         if (issuerUri == null || issuerUri.isBlank() || issuerUri.contains("<TENANT_ID>")) {
             return token -> {
                 throw new BadJwtException("Azure Entra ID no configurado. Defina JWT_ISSUER_URI y JWT_AUDIENCE en su .env");
@@ -160,7 +160,7 @@ public class SecurityConfig {
                     "timestamp", LocalDateTime.now().toString(),
                     "status", HttpStatus.UNAUTHORIZED.value(),
                     "error", "Unauthorized",
-                    "message", "Token de autenticaciÃƒÆ’Ã‚Â³n invÃƒÆ’Ã‚Â¡lido, expirado o ausente. " + authException.getMessage(),
+                    "message", "Token de autenticación inválido, expirado o ausente. " + authException.getMessage(),
                     "path", request.getRequestURI()
             );
 
